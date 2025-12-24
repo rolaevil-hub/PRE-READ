@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>預測閱讀策略練習器 (AI 增強版)</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #f0f4f8;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --white: #ffffff;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --radius: 12px;
+            --sparkle: #8b5cf6;
+            --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        /* Utility Classes */
+        .hidden { display: none !important; }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .justify-center { justify-content: center; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-4 { gap: 1rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mb-8 { margin-bottom: 2rem; }
+        .text-center { text-align: center; }
+        .font-bold { font-weight: bold; }
+        .w-full { width: 100%; }
+
+        /* Typography */
+        h1 { font-size: 2rem; color: #1e293b; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.5rem; color: #334155; }
+        h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; }
+        p { margin-bottom: 1rem; }
+
+        /* Components */
+        .card {
+            background: var(--white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            transition: transform 0.2s;
+            border: 1px solid #e2e8f0;
+            position: relative; /* For delete button positioning */
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: #cbd5e1;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--primary);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+            text-decoration: none;
+            gap: 8px;
+        }
+
+        .btn:hover { background-color: var(--primary-hover); }
+        .btn:disabled { background-color: #cbd5e1; cursor: not-allowed; }
+        
+        .btn-secondary {
+            background-color: #64748b;
+        }
+        .btn-secondary:hover { background-color: #475569; }
+
+        .btn-success {
+            background-color: #059669;
+        }
+        .btn-success:hover { background-color: #047857; }
+
+        .btn-ai {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+        }
+        .btn-ai:hover {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-delete {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid #fee2e2;
+            color: var(--danger);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            opacity: 0; /* Hidden by default */
+        }
+        .card:hover .btn-delete { opacity: 1; }
+        .btn-delete:hover {
+            background-color: #fee2e2;
+            transform: scale(1.1);
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .input-field:focus { border-color: var(--primary); }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .tag-entry { background-color: #dcfce7; color: #166534; }
+        .tag-med { background-color: #dbeafe; color: #1e40af; }
+        .tag-adv { background-color: #f3e8ff; color: #6b21a8; }
+        .tag-ai { background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%); color: #6b21a8; border: 1px solid #d8b4fe; }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e2e8f0;
+            border-radius: 999px;
+            height: 0.5rem;
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: var(--primary);
+            transition: width 0.3s ease;
+        }
+
+        .svg-icon {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
+
+        /* Reading View specific */
+        .reading-text {
+            font-size: 1.15rem;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            color: #334155;
+            padding: 2rem;
+            border-left: 6px solid var(--primary);
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+
+        .prediction-box {
+            background-color: #eef2ff;
+            border: 1px solid #c7d2fe;
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--radius);
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            animation: rotate 2s linear infinite;
+            width: 20px;
+            height: 20px;
+        }
+        @keyframes rotate {
+            100% { transform: rotate(360deg); }
+        }
+
+        .ai-feedback-box {
+            background: linear-gradient(to right, #f5f3ff, #fff);
+            border: 1px solid #ddd6fe;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .ai-feedback-box::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 4px; height: 100%;
+            background: #8b5cf6;
+        }
+
+        /* Print Styles */
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; color: black; }
+            .container { padding: 0; max-width: 100%; }
+            .card, .reading-text, .prediction-box, .ai-feedback-box {
+                box-shadow: none;
+                border: 1px solid #ccc;
+                page-break-inside: avoid;
+            }
+            .reading-text { border-left: 4px solid #000; padding: 1rem; }
+            h1 { font-size: 1.8rem; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+            .print-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="container">
+        <!-- Javascript will render content here -->
+    </div>
+
+    <!-- Modal Template (Hidden by default) -->
+    <div id="aiModal" class="modal-overlay hidden">
+        <div class="modal">
+            <h2 class="mb-4 flex items-center gap-2" style="color:var(--sparkle)">
+                <span class="svg-icon">✨</span> AI 故事生成器
+            </h2>
+            <p>請輸入您想練習的主題（例如：海底探險、深夜的博物館、迷路的機器人）：</p>
+            <input type="text" id="aiTopicInput" class="input-field mb-4" placeholder="輸入主題...">
+            <div class="flex justify-between">
+                <button class="btn btn-secondary" onclick="closeAiModal()">取消</button>
+                <button class="btn btn-ai" onclick="generateStory()">
+                    <span id="genBtnText">開始生成</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA ---
+        const initialStories = [
+            {
+                id: 1,
+                title: "L7 格理弗遊記的諷刺與翻譯",
+                description: "這部童話經典其實隱藏著辛辣的政治諷刺。當翻譯出錯或細節被改動時，寓意就會煙消雲散。",
+                difficulty: "進階",
+                segments: [
+                    {
+                        text: "綏夫特《格理弗遊記》（舊譯《格列佛遊記》或《大小人國遊記》）在中文世界裡幾乎是人盡皆知的兒童奇幻文學，但在英文世界裡它其實是一部用來諷刺人性、英國時政與權貴的作品。原書有四冊，但許多中譯本只有第一、二冊的《小人國》、《大人國》，使人無法窺其全貌。",
+                        question: "既然是針對「英國時政」的諷刺作品，您預測作者在描寫小人國的國王與官員時，會刻意安排什麼樣滑稽的舉動來影射現實？",
+                        hint: "思考：權力者通常很有威嚴，若讓他們做一些卑微或奇怪的動作，會有什麼諷刺效果？"
+                    },
+                    {
+                        text: "在原始版本中，小人國國王將三種不同顏色的細絲線：藍、紅、綠，賞賜給表演類似凌波舞舞技最佳的三個人。其實不同顏色的絲線，是分別影射當時三種頒予爵士的勳章：藍色綬帶的嘉德勳章、紅色綬帶的巴斯勳章、綠色綬帶的薊勳章。",
+                        question: "作者為什麼要用「凌波舞技」來決定誰能獲得象徵榮譽的絲線（勳章）？這在影射當時官員的什麼特質？",
+                        hint: "思考：跳凌波舞需要筋骨柔軟。在官場上，「柔軟」的人代表什麼？"
+                    },
+                    {
+                        text: "因為凌波舞高手的筋骨要很柔軟，綏夫特用來影射沒有骨氣的人才能得到寵愛、成為高官。但也因為暗示過於明顯，出版商擔心會得罪當道，所以在出版時將絲線的顏色改為紫、黃、白。顏色一改，寓意就煙消雲散。",
+                        question: "除了內容的改動，文章提到「翻譯」也會造成影響。如果將主角的重要專業身分譯錯，您預測會對故事的邏輯產生什麼衝擊？",
+                        hint: "思考：主角在航行中若遇到傷病，他的身分必須合理才能解決問題。"
+                    },
+                    {
+                        text: "此外，早期的中文版有誤譯之處。如原書中應指「醫學」一詞，卻被譯者翻成「格物學」。所學的內容一變，主人翁船醫的身分也就變了，在長途航行中該如何發揮所學令人有些困惑。由此可見，翻譯時被誤解的內容，有時會有極大的影響。",
+                        question: "練習結束。",
+                        isEnd: true
+                    }
+                ]
+            },
+            {
+                id: 2,
+                title: "L8 愛丁堡的圖書館與時間表",
+                description: "關於一段異鄉求學的記憶。當生活只剩下一條通往目標的路徑時，我們會錯過什麼？",
+                difficulty: "中等",
+                segments: [
+                    {
+                        text: "最近，我經常想起愛丁堡，可能是因為冬天快到了吧。愛丁堡是一個很冷的城市。當我想起這個城市的時候，我通常只記得從我住的地方走到圖書館的路。其他的地方，我有時候連名字都記不清了。我在愛丁堡住了三年，但離開後，有關它的記憶卻漸漸模糊起來。",
+                        question: "作者提到對這座城市的記憶只剩下「去圖書館的路」，這可能反映了他當時在異鄉的生活重心是什麼？",
+                        hint: "思考：一個留學生除了圖書館，還有什麼可能是他生活的中心？"
+                    },
+                    {
+                        text: "在愛丁堡期間，我常常從宿舍走到國家圖書館。有時候，我也會去大學圖書館或神學院圖書館找資料。我喜歡圖書館，尤其是那些老舊的圖書館，因為那裡有厚重的木頭桌椅，氣氛很安靜，而且有一種古老書本的味道。我最期待的時間是下午三四點，那時我會去對面的“大象咖啡館”喝咖啡，吃杏仁牛角麵包，並看報紙。那家咖啡館的窗戶正好對著一座古老的城堡。在溫暖熱鬧的咖啡館裡，看著遠處冷峻的城堡，給了我一種特別的感受。",
+                        question: "在溫暖的咖啡館看著「冷峻且歷史悠久」的城堡，作者說這提醒他「在這裡的時間只是短暫的一小部分」。您預測作者接下來會如何描述他對「時間」的規劃？",
+                        hint: "思考：既然感覺到時間短暫，人通常會產生一種緊迫感或計畫感。"
+                    },
+                    {
+                        text: "當我二十多歲的時候，我去愛丁堡是為了學習。我知道我不會永遠住在那裡，因為我只是為了完成學業，然後要回家。那時，我心裡有一張時間表，提醒我什麼時候要完成學業回家。這讓我的每一天都不是單獨的日子，而是一連串朝向未來的日子。",
+                        question: "作者提到他當時有一張「時間表」且極度專注於目標。這聽起來很積極，但您預測作者長大後會如何反思這段「單一專注」的日子？",
+                        hint: "思考：過度專注於單一目標（如學業），可能會讓我們忽略周遭的什麼事物？"
+                    },
+                    {
+                        text: "那時候，我們專注於一個目標——學習。我們不知道這樣做會讓我們錯過許多其他的事情。等我們長大一些後，才會發現這樣單一的專注會讓我們的視野變得狹窄。由這個故事我們可以發現，在朝向目標前進的同時，也要學會抬頭看看身邊的風景。",
+                        question: "練習結束。",
+                        isEnd: true
+                    }
+                ]
+            },
+            {
+                id: 3,
+                title: "L9 親耕儀式與早朝秩序",
+                description: "古代皇帝的日常生活。透過親耕的「表演」與早朝的「紀律」，看見政權的象徵意義。",
+                difficulty: "中等",
+                segments: [
+                    {
+                        text: "在古代，皇帝是全國最高的領導人，他的很多行動都有特別的象徵意義。每年，皇帝會在先農壇附近進行一個叫「親耕」的活動，這有點像是一場表演。在這個活動開始前，政府會找一些專業的演員來假扮成風神、雨神等，還會邀請很多在地的農民來參加，就像在演戲一樣。",
+                        question: "既然說這是一場「表演」，且連風神、雨神都有人假扮，您預測皇帝所使用的耕地工具（犁），會是普通的農具還是有特殊的裝飾？",
+                        hint: "思考：身為最高領導人的「表演」，細節一定會展現出權威感。"
+                    },
+                    {
+                        text: "活動開始時，有兩個官員牽著牛，兩位長輩扶著犁，其他被指定的農民則帶著各種農具，模仿耕作的樣子。有些演員還會裝扮成村裡的人，唱著太平的歌。皇帝用的犁和別人的不一樣，是特別華麗的金色犁，上面還有龍的雕刻。在兩位長輩的幫忙下，皇帝走過田地三次，就完成了「親耕」的儀式。",
+                        question: "皇帝完成這三次象徵性的耕作後，接下來會由誰來繼續完成播種工作？最後如何向皇帝表達祝賀？",
+                        hint: "思考：儀式的完成通常需要地方官員的配合，最後還要有一種「大豐收」的氛圍。"
+                    },
+                    {
+                        text: "完成後，皇帝坐下來，欣賞其他官員模仿他的動作。北京的最高地方官負責播種，他播完種後，有人會端上象徵好收成的五穀，向皇帝獻上，表示因為皇帝的辛勞帶來了豐收。這時候，大家都會向皇帝高喊萬歲，祝賀他。不過，皇帝的事情不都是這麼輕鬆好玩的，像每天的「早朝」就很嚴肅。",
+                        question: "早朝是非常嚴肅的。您預測在早朝的隊伍中，官員的行為會受到什麼樣的監督？",
+                        hint: "思考：在皇帝面前，咳嗽或不禮貌的行為會被允許嗎？"
+                    },
+                    {
+                        text: "門開了之後，大家會站好隊伍，文官和武官各自站在不同的位置。御史會負責點名，並且記錄那些咳嗽或有不禮貌行為的官員名字。接著皇帝來了，所有官員都要向皇帝行禮。然後，一些重要的官員會進入大殿報告事情。這些早朝的活動大約會在日出時開始，不久後結束。由這篇文章可見，古代的儀節是為了維持秩序與統治的莊嚴感。",
+                        question: "練習結束。",
+                        isEnd: true
+                    }
+                ]
+            },
+            {
+                id: 4,
+                title: "怒海求生：風暴中的決策",
+                description: "一艘漁船遭遇空前風暴。在船舵失靈、進水警報響起的絕境中，船長如何做出決定？",
+                difficulty: "中等",
+                segments: [
+                    {
+                        text: "一艘漁船在遠洋作業時，突然遭遇了一場從未預警的強烈風暴。船長李明經驗豐富，立刻下令收網，並指示船員盡快將船隻駛向最近的避風港。然而，風浪之大，使得船身劇烈搖晃，儀表板上的指針瘋狂跳動，通訊設備也因浪花拍打而失靈。他們試圖改變航向，但發現船舵似乎被某種東西卡住了，難以操控。天空在幾分鐘內變得漆黑一片，豆大的雨點夾雜著冰雹砸了下來。",
+                        question: "船舵失靈且通訊中斷，您預測船長接下來會採取什麼緊急措施來穩住船隻？",
+                        hint: "思考：如果無法控制方向，首要任務是避免船隻隨波逐流。"
+                    },
+                    {
+                        text: "船長李明緊咬牙關，他立刻意識到，在這樣的風浪中嘗試修理船舵極度危險。他透過擴音器吼道：「拋錨！所有人都到船艙下層，繫好安全帶！」大副王猛迅速衝到船頭，費力地拉動了釋放錨索的緊急手柄。巨大的鐵錨落入大海，船身傳來一聲劇烈的震動，漂移的速度略微減緩。然而，錨索的長度似乎不足以讓錨觸及穩定的深海底部。就在這時，船艙內突然響起一陣尖銳的警報聲。",
+                        question: "錨索長度不足且警報聲響起，您預測發生了什麼新的危機？",
+                        hint: "思考：警報通常代表內部受損或緊急狀況。"
+                    },
+                    {
+                        text: "警報來自船艙底部——進水警報！李明迅速判斷形勢，將對講機塞給大副：「王猛，你帶兩個人去修理船舵，試圖保持迎風。其他人跟我下底艙，準備啟動應急水泵！」就在他們分頭行動時，王猛驚恐地喊道：「船長！錨索快斷了！我們正被拖向前方霧中的巨大黑影，那看起來是個島！」",
+                        question: "進水、錨索斷裂、前方有黑影。這是最後的決策時刻，您預測結局會如何？",
+                        hint: "思考：在船隻即將沉沒且無法控制的情況下，唯一的生存機會在哪裡？"
+                    },
+                    {
+                        text: "李明明白一切都結束了，修理已無意義。他抓起對講機吼道：「全速前進！對準黑影衝！我們要搶灘！」在最後的指令下，船隻藉著風浪猛烈地衝向海岸線。轟隆一聲巨響，船隻側翻並擱淺在岩石海岸上。雖然船毀了，但在黑暗中，陸續傳來了船員們確認彼此存活的呼喊聲。",
+                        question: "練習結束。",
+                        isEnd: true
+                    }
+                ]
+            },
+            {
+                id: 5,
+                title: "鰻魚效應：對手的價值",
+                description: "為什麼有的漁民能讓鰻魚活著回港？一個關於競爭、危機感與生命力的經典寓言。",
+                difficulty: "入門",
+                segments: [
+                    {
+                        text: "因為有對手存在，日本的北海道出產一種味道珍奇的鰻魚，海邊漁村的許多漁民都以捕撈鰻魚為生。鰻魚的生命非常脆弱，只要一離開深海區，要不了半天就會全部死亡。奇怪的是有一位老漁民天天出海捕撈鰻魚，返回岸邊後，他的鰻魚總是活蹦亂跳的。而其他幾家漁戶，回港後鰻魚全都是死的。",
+                        question: "為什麼只有這位老漁民的鰻魚能活下來？請預測他的祕訣可能與什麼有關？",
+                        hint: "思考：標題是「因為有對手存在」。"
+                    },
+                    {
+                        text: "原來，老漁民使鰻魚不死的秘訣，就是在整倉的鰻魚中，放進幾條叫狗魚的雜魚。鰻魚與狗魚非但不是同類，還是出名「對頭」。幾條勢單力薄的狗魚遇到成倉的對手，便驚慌地在鰻魚堆裡四處亂竄，這樣一來，反而倒把滿滿一船倉死氣沉沉的鰻魚全給擊活了。",
+                        question: "作者講述這個故事是為了引出什麼樣的人生或社會道理？請預測文章接下來的論述方向。",
+                        hint: "思考：將「鰻魚與狗魚」的競爭關係應用到人類社會。"
+                    },
+                    {
+                        text: "一種動物如果沒有對手，就會變得死氣沉沉。同樣的，一個人如果沒有對手，那他就會甘於平庸。有了對手，才有危機感，才會有競爭力。善待你的對手吧，因為他的存在，你才會永遠是一條鮮活的「鰻魚」。",
+                        question: "練習結束。",
+                        isEnd: true
+                    }
+                ]
+            }
+        ];
+
+        // --- SVGs ---
+        const svgs = {
+            brain: `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 4.5a2.5 2.5 0 0 0-4.96-.46 2.5 2.5 0 0 0-1.98 3 2.5 2.5 0 0 0-1.32 3 2.5 2.5 0 0 0 .38 2.7 2.5 2.5 0 0 0-1.62 3 2.5 2.5 0 0 0 2.7 2.2c.4 0 .77-.13 1.1-.34A2.5 2.5 0 0 0 12 19.5a2.5 2.5 0 0 0 5.7 0 2.5 2.5 0 0 0 5.7-1.84 2.5 2.5 0 0 0 1.1.34 2.5 2.5 0 0 0 2.7-2.2 2.5 2.5 0 0 0-1.62-3 2.5 2.5 0 0 0 .38-2.7 2.5 2.5 0 0 0-1.32-3 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 12 4.5Z"/><path d="M12 10v4"/></svg>`,
+            book: `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>`,
+            arrowRight: `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>`,
+            user: `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+            bulb: `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2 1.5-3.5a6 6 0 0 0-11 0c0 1.5.5 2.5 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
+            refresh: `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>`,
+            print: `<svg class="svg-icon" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>`,
+            check: `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+            sparkle: `<svg class="svg-icon" viewBox="0 0 24 24"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>`,
+            key: `<svg class="svg-icon" viewBox="0 0 24 24"><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>`,
+            star: `<svg class="svg-icon" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+            trash: `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`
+        };
+
+        // --- STORAGE HELPERS ---
+        const STORAGE_KEY_STORIES = 'prediction_app_custom_stories';
+
+        function getStoredStories() {
+            try {
+                return JSON.parse(localStorage.getItem(STORAGE_KEY_STORIES) || '[]');
+            } catch {
+                return [];
+            }
+        }
+
+        function saveStoredStories(stories) {
+            localStorage.setItem(STORAGE_KEY_STORIES, JSON.stringify(stories));
+        }
+
+        // --- STATE & APP LOGIC ---
+        const appState = {
+            currentView: 'home',
+            studentName: '',
+            apiKey: '',
+            selectedStory: null,
+            segmentIndex: 0,
+            userInput: '',
+            history: [],
+            // Initialize with saved stories merged with built-in ones
+            stories: [...getStoredStories(), ...initialStories],
+            aiFeedback: null
+        };
+
+        const appDiv = document.getElementById('app');
+
+        function render() {
+            appDiv.innerHTML = '';
+            
+            if (appState.currentView === 'home') {
+                renderHome();
+            } else if (appState.currentView === 'reading') {
+                renderReading();
+            } else if (appState.currentView === 'summary') {
+                renderSummary();
+            }
+        }
+
+        // --- GEMINI API HELPERS ---
+        async function callGeminiAPI(systemPrompt, userPrompt, jsonMode = false) {
+            if (!appState.apiKey) {
+                alert("請先在首頁輸入您的 Gemini API Key！");
+                throw new Error("No API Key");
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${appState.apiKey}`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: userPrompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+            };
+
+            if (jsonMode) {
+                payload.generationConfig = { responseMimeType: "application/json" };
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                
+                const data = await response.json();
+                return data.candidates[0].content.parts[0].text;
+            } catch (error) {
+                console.error("Gemini API Call Failed:", error);
+                alert("AI 呼叫失敗，請檢查 API Key 或網路連線。");
+                throw error;
+            }
+        }
+
+        // --- AI ACTIONS ---
+        function openAiModal() {
+            document.getElementById('aiModal').classList.remove('hidden');
+        }
+
+        function closeAiModal() {
+            document.getElementById('aiModal').classList.add('hidden');
+        }
+
+        async function generateStory() {
+            const topic = document.getElementById('aiTopicInput').value.trim();
+            if (!topic) return alert("請輸入主題！");
+
+            const btn = document.querySelector('#aiModal .btn-ai');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<div class="spinner"></div> 生成中...`;
+            btn.disabled = true;
+
+            const systemPrompt = `你是一個專業的閱讀教育專家，請為學生撰寫一篇關於「${topic}」的繁體中文預測閱讀練習故事。
+            故事結構要求：
+            1. 標題 (title)：吸引人的標題。
+            2. 描述 (description)：簡短的故事大綱。
+            3. 段落 (segments)：將故事分為 3-4 個段落。
+               - 前面的段落 (isEnd: false)：包含一段故事文字 (text)，一個引導學生預測後續發展的問題 (question)，以及一個思考提示 (hint)。
+               - 最後一個段落 (isEnd: true)：包含結局文字 (text)，question 設為 "練習結束"，hint 設為 null。
+            請直接輸出純 JSON 格式。`;
+
+            try {
+                const jsonStr = await callGeminiAPI(systemPrompt, `請創作關於 ${topic} 的故事`, true);
+                const newStory = JSON.parse(jsonStr);
+                
+                // Add ID and Difficulty
+                newStory.id = Date.now();
+                newStory.difficulty = "AI 生成";
+                newStory.isCustom = true; // Flag for custom story
+                
+                // 1. Get current custom stories from storage
+                const customStories = getStoredStories();
+                // 2. Add new one to the front
+                customStories.unshift(newStory);
+                // 3. Save back to storage
+                saveStoredStories(customStories);
+                
+                // 4. Update app state
+                appState.stories = [...customStories, ...initialStories];
+                
+                closeAiModal();
+                alert("故事生成成功！已加入列表最上方，並已自動儲存。");
+                render(); // Re-render home to show new story
+            } catch (e) {
+                // Error handled in helper
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        window.deleteStory = function(id, event) {
+            event.stopPropagation(); // Prevent clicking card to start story
+            if(confirm("確定要永久刪除這個故事嗎？")) {
+                // 1. Update Storage
+                const customStories = getStoredStories().filter(s => s.id !== id);
+                saveStoredStories(customStories);
+                
+                // 2. Update State
+                appState.stories = [...customStories, ...initialStories];
+                render();
+            }
+        }
+
+        async function getAIFeedback() {
+            const btn = document.getElementById('feedbackBtn');
+            const box = document.getElementById('aiFeedbackContent');
+            
+            btn.innerHTML = `<div class="spinner"></div> 分析中...`;
+            btn.disabled = true;
+
+            const systemPrompt = "你是一位親切的閱讀老師。請閱讀學生的預測紀錄與故事原文，給予繁體中文的評語。指出學生預測的合理之處，以及可以改進的思考方向。語氣要鼓勵且具啟發性。請使用 HTML 格式輸出 (使用 <p>, <ul>, <li>, <strong> 等標籤)。";
+            
+            let userContent = `故事標題：${appState.selectedStory.title}\n\n`;
+            appState.history.forEach((h, i) => {
+                userContent += `段落 ${i+1} 原文：${h.text}\n`;
+                userContent += `引導問題：${h.question}\n`;
+                userContent += `學生預測：${h.prediction}\n\n`;
+            });
+            userContent += `結局：${appState.selectedStory.segments[appState.selectedStory.segments.length - 1].text}`;
+
+            try {
+                const feedbackHtml = await callGeminiAPI(systemPrompt, userContent, false);
+                appState.aiFeedback = feedbackHtml;
+                box.innerHTML = feedbackHtml;
+                document.getElementById('aiFeedbackContainer').classList.remove('hidden');
+                btn.style.display = 'none'; // Hide button after success
+            } catch (e) {
+                btn.innerHTML = `${svgs.sparkle} 取得 AI 老師點評`;
+                btn.disabled = false;
+            }
+        }
+
+        // --- HOME VIEW ---
+        function renderHome() {
+            const header = document.createElement('header');
+            header.className = 'text-center mb-8';
+            header.innerHTML = `
+                <h1 class="font-bold flex justify-center items-center gap-2">
+                    ${svgs.brain} 預測閱讀策略練習器
+                </h1>
+                <p style="color:var(--text-sub)">離線版 - 隨時隨地鍛鍊閱讀思考力 (AI 功能需連網)</p>
+            `;
+
+            const settingsCard = document.createElement('div');
+            settingsCard.className = 'card mb-8';
+            settingsCard.style.maxWidth = '600px';
+            settingsCard.style.margin = '0 auto 2rem auto';
+            settingsCard.innerHTML = `
+                <div class="flex flex-col gap-4">
+                    <div>
+                        <label style="display:block; margin-bottom:0.5rem; font-weight:bold; display:flex; gap:0.5rem; align-items:center;">
+                            ${svgs.user} 學生姓名
+                        </label>
+                        <input type="text" id="studentNameInput" class="input-field" placeholder="請輸入姓名..." value="${appState.studentName}">
+                    </div>
+                    <div>
+                        <label style="display:block; margin-bottom:0.5rem; font-weight:bold; display:flex; gap:0.5rem; align-items:center;">
+                            ${svgs.key} Gemini API Key <span style="font-size:0.8rem; color:var(--text-sub); font-weight:normal;">(使用 AI 功能必填)</span>
+                        </label>
+                        <input type="password" id="apiKeyInput" class="input-field" placeholder="貼上您的 API Key..." value="${appState.apiKey}">
+                    </div>
+                </div>
+            `;
+
+            const actionArea = document.createElement('div');
+            actionArea.className = 'flex justify-center mb-8';
+            actionArea.innerHTML = `
+                <button class="btn btn-ai" onclick="openAiModal()">
+                    ${svgs.sparkle} AI 生成新故事
+                </button>
+            `;
+
+            const grid = document.createElement('div');
+            grid.className = 'grid-layout';
+
+            appState.stories.forEach(story => {
+                const card = document.createElement('div');
+                card.className = 'card flex flex-col justify-between';
+                
+                let tagClass = 'tag-med';
+                if(story.difficulty === '入門') tagClass = 'tag-entry';
+                if(story.difficulty === '進階') tagClass = 'tag-adv';
+                if(story.difficulty === 'AI 生成') tagClass = 'tag-ai';
+
+                const isCustom = story.isCustom || story.difficulty === 'AI 生成';
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="tag ${tagClass}">${story.difficulty}</span>
+                            ${svgs.book}
+                        </div>
+                        <h3>${story.title}</h3>
+                        <p style="color:var(--text-sub); font-size:0.95rem;">${story.description}</p>
+                    </div>
+                    <button class="btn w-full" onclick="startStory(${story.id})">
+                        開始練習 ${svgs.arrowRight}
+                    </button>
+                    ${isCustom ? `<button class="btn-delete" onclick="deleteStory(${story.id}, event)" title="刪除此故事">${svgs.trash}</button>` : ''}
+                `;
+                grid.appendChild(card);
+            });
+
+            appDiv.appendChild(header);
+            appDiv.appendChild(settingsCard);
+            appDiv.appendChild(actionArea);
+            appDiv.appendChild(grid);
+
+            // Listen to input changes
+            document.getElementById('studentNameInput').addEventListener('input', (e) => {
+                appState.studentName = e.target.value;
+            });
+            document.getElementById('apiKeyInput').addEventListener('input', (e) => {
+                appState.apiKey = e.target.value;
+            });
+        }
+
+        // --- READING VIEW ---
+        function renderReading() {
+            const segment = appState.selectedStory.segments[appState.segmentIndex];
+            const total = appState.selectedStory.segments.length - 1;
+            const progress = ((appState.segmentIndex + 1) / total) * 100;
+
+            const header = document.createElement('div');
+            header.className = 'flex justify-between items-center mb-4';
+            header.innerHTML = `
+                <button class="btn btn-secondary" style="padding:0.5rem 1rem; font-size:0.9rem;" onclick="goHome()">
+                    ${svgs.refresh} 退出
+                </button>
+                <div style="font-weight:600; color:var(--text-sub)">
+                    進度：${appState.segmentIndex + 1} / ${total}
+                </div>
+            `;
+
+            const progressBar = document.createElement('div');
+            progressBar.className = 'progress-container';
+            progressBar.innerHTML = `<div class="progress-bar" style="width: ${Math.min(progress, 100)}%"></div>`;
+
+            const textCard = document.createElement('div');
+            textCard.className = 'reading-text';
+            textCard.textContent = segment.text;
+
+            const interactionArea = document.createElement('div');
+            
+            if (!segment.isEnd) {
+                interactionArea.className = 'prediction-box';
+                interactionArea.innerHTML = `
+                    <div class="flex items-center gap-2 mb-4" style="color:var(--primary); font-weight:bold;">
+                        ${svgs.bulb} <h3>預測提問</h3>
+                    </div>
+                    <p style="font-weight:600; margin-bottom:0.5rem;">${segment.question}</p>
+                    <p style="font-size:0.9rem; color:var(--text-sub); font-style:italic; margin-bottom:1rem;">提示：${segment.hint}</p>
+                    <textarea id="userPrediction" class="input-field" style="min-height:120px; margin-bottom:1rem;" placeholder="我預測接下來..."></textarea>
+                    <div class="flex" style="justify-content:flex-end;">
+                        <button class="btn" onclick="submitPrediction()">確認並繼續 ${svgs.arrowRight}</button>
+                    </div>
+                `;
+            } else {
+                interactionArea.className = 'text-center';
+                interactionArea.style.marginTop = '2rem';
+                interactionArea.innerHTML = `
+                    <h3 style="color:#059669; margin-bottom:1rem;">🎉 練習完成！</h3>
+                    <button class="btn btn-success" onclick="finishStory()">查看學習紀錄 ${svgs.check}</button>
+                `;
+            }
+
+            appDiv.appendChild(header);
+            appDiv.appendChild(progressBar);
+            appDiv.appendChild(textCard);
+            appDiv.appendChild(interactionArea);
+        }
+
+        // --- SUMMARY VIEW ---
+        function renderSummary() {
+            const dateStr = new Date().toLocaleDateString();
+
+            const container = document.createElement('div');
+            
+            // Non-printable Action Bar
+            const actionBar = document.createElement('div');
+            actionBar.className = 'flex justify-between items-center mb-8 no-print';
+            actionBar.innerHTML = `
+                <h2 style="margin:0;">學習紀錄卡</h2>
+                <div class="flex gap-2">
+                    <button class="btn btn-success" onclick="window.print()">
+                        ${svgs.print} 列印 / 存為 PDF
+                    </button>
+                    <button class="btn btn-secondary" onclick="goHome()">
+                        返回首頁
+                    </button>
+                </div>
+            `;
+
+            // Printable Report Area
+            const report = document.createElement('div');
+            report.className = 'card';
+            
+            // Generate History HTML
+            const historyHtml = appState.history.map((item, idx) => `
+                <div style="padding-left:1.5rem; border-left:4px solid #e2e8f0;">
+                    <div style="margin-bottom:1rem;">
+                        <span style="background:#f1f5f9; font-size:0.75rem; font-weight:bold; padding:2px 8px; border-radius:4px; color:#64748b;">段落 ${idx + 1}</span>
+                        <div style="background:#f8fafc; padding:1rem; border-radius:8px; margin-top:0.5rem; font-style:italic; border:1px solid #f1f5f9;">
+                            ${item.text}
+                        </div>
+                    </div>
+                    
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+                        <div style="background:#eef2ff; padding:1rem; border-radius:8px; border:1px solid #e0e7ff;">
+                            <div style="font-size:0.8rem; font-weight:bold; color:#4338ca; margin-bottom:0.25rem;">引導問題</div>
+                            <div>${item.question}</div>
+                        </div>
+                        <div style="background:#fff7ed; padding:1rem; border-radius:8px; border:1px solid #ffedd5;">
+                            <div style="font-size:0.8rem; font-weight:bold; color:#c2410c; margin-bottom:0.25rem;">學生預測</div>
+                            <div style="font-weight:bold; color:#1e293b;">${item.prediction}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // AI Feedback Section (Initially hidden or populated if exists)
+            const aiSectionHtml = `
+                <div id="aiFeedbackContainer" class="no-print ${appState.aiFeedback ? '' : 'hidden'}">
+                    <div class="ai-feedback-box">
+                        <h4 style="color:#6d28d9; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+                            ${svgs.star} AI 老師點評
+                        </h4>
+                        <div id="aiFeedbackContent" style="color:#4b5563;">
+                            ${appState.aiFeedback || ''}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="no-print text-center mt-8">
+                    ${!appState.aiFeedback ? `
+                        <button id="feedbackBtn" class="btn btn-ai" onclick="getAIFeedback()">
+                            ${svgs.sparkle} 取得 AI 老師點評
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+
+            report.innerHTML = `
+                <div class="print-header" style="border-bottom:2px solid var(--primary); padding-bottom:1rem; margin-bottom:2rem; display:flex; justify-content:space-between; align-items:flex-end;">
+                    <div>
+                        <h1 style="font-size:1.8rem; margin-bottom:0.5rem; color:var(--primary);">${appState.selectedStory.title}</h1>
+                        <p style="margin:0; color:var(--text-sub); font-weight:bold;">預測閱讀策略練習紀錄</p>
+                    </div>
+                    <div style="text-align:right;">
+                        <p style="font-size:0.9rem; color:var(--text-sub); font-weight:bold;">學生姓名</p>
+                        <p style="font-size:1.5rem; font-weight:bold;">${appState.studentName}</p>
+                        <p style="font-size:0.85rem; color:#94a3b8;">${dateStr}</p>
+                    </div>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:2rem;">
+                    ${historyHtml}
+                    
+                    <div style="background:#1e293b; color:white; padding:1.5rem; border-radius:12px; margin-top:1rem; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                        <h4 style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; color:#818cf8;">
+                            ${svgs.book} 結局與啟示
+                        </h4>
+                        <p style="margin:0; font-size:1.1rem;">
+                            ${appState.selectedStory.segments[appState.selectedStory.segments.length - 1].text}
+                        </p>
+                    </div>
+                </div>
+
+                ${aiSectionHtml}
+                
+                <div style="margin-top:3rem; text-align:center; font-size:0.8rem; color:#cbd5e1; border-top:1px solid #f1f5f9; padding-top:1rem;">
+                    預測閱讀策略練習器 (AI 增強版)
+                </div>
+            `;
+
+            container.appendChild(actionBar);
+            container.appendChild(report);
+            appDiv.appendChild(container);
+        }
+
+        // --- ACTIONS ---
+
+        window.startStory = function(id) {
+            if (!appState.studentName.trim()) {
+                alert("請先輸入您的姓名，以便在最後產生學習紀錄。");
+                return;
+            }
+            const story = appState.stories.find(s => s.id === id);
+            appState.selectedStory = story;
+            appState.segmentIndex = 0;
+            appState.history = [];
+            appState.userInput = '';
+            appState.aiFeedback = null; // Reset feedback for new session
+            appState.currentView = 'reading';
+            render();
+        }
+
+        window.submitPrediction = function() {
+            const input = document.getElementById('userPrediction');
+            const val = input.value.trim();
+            if (!val) {
+                alert("請輸入您的預測！");
+                return;
+            }
+
+            const currentSeg = appState.selectedStory.segments[appState.segmentIndex];
+            
+            appState.history.push({
+                text: currentSeg.text,
+                question: currentSeg.question,
+                prediction: val
+            });
+
+            // Next segment
+            if (appState.segmentIndex < appState.selectedStory.segments.length - 1) {
+                appState.segmentIndex++;
+                render(); // Re-render reading view with next segment
+            } else {
+                // Should not happen based on logic but safe guard
+                finishStory();
+            }
+        }
+
+        window.finishStory = function() {
+            appState.currentView = 'summary';
+            render();
+        }
+
+        window.goHome = function() {
+            if (confirm("確定要返回首頁嗎？目前的進度將會消失。")) {
+                appState.currentView = 'home';
+                appState.selectedStory = null;
+                appState.history = [];
+                render();
+            }
+        }
+
+        // Initial Render
+        render();
+
+    </script>
+</body>
+</html>
