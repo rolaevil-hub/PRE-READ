@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>預測閱讀策略練習器 (含內建測驗版)</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #f0f4f8;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --white: #ffffff;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --radius: 16px;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--text-main); line-height: 1.6; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; min-height: 100vh; }
+        
+        /* Helpers */
+        .hidden { display: none !important; }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-4 { gap: 1rem; }
+        .text-center { text-align: center; }
+        .font-bold { font-weight: bold; }
+        .w-full { width: 100%; }
+        
+        /* UI Components */
+        .card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); padding: 2rem; border: 1px solid #e2e8f0; transition: transform 0.2s; }
+        .card:hover { border-color: #cbd5e1; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.75rem 1.5rem; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; transition: all 0.2s; gap: 8px; font-size: 1rem; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); }
+        .btn-secondary { background: #e2e8f0; color: var(--text-main); }
+        .btn-secondary:hover { background: #cbd5e1; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { background: #059669; }
+        .btn-warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+        .btn-warning:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
+        
+        .input-field { width: 100%; padding: 1rem; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1rem; outline: none; }
+        .input-field:focus { border-color: var(--primary); }
+
+        /* Quiz Styles */
+        .quiz-option { display: block; width: 100%; text-align: left; padding: 1.2rem; margin-bottom: 1rem; border: 2px solid #e2e8f0; border-radius: 10px; background: white; cursor: pointer; transition: all 0.2s; font-size: 1.05rem; }
+        .quiz-option:hover:not(.disabled) { border-color: var(--primary); background: #eef2ff; }
+        .quiz-option.selected { border-color: var(--primary); background: #e0e7ff; font-weight: bold; }
+        .quiz-option.correct { border-color: var(--success); background: #ecfdf5; color: #065f46; }
+        .quiz-option.wrong { border-color: var(--danger); background: #fef2f2; color: #991b1b; }
+        
+        .explanation-box { background: #fffbeb; border: 1px solid #fde68a; padding: 1rem; border-radius: 8px; color: #92400e; margin-top: 0.5rem; }
+        .tag { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.85rem; font-weight: bold; margin-bottom: 0.5rem; background: #e0e7ff; color: var(--primary); }
+
+        /* Icons */
+        .svg-icon { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="container"></div>
+
+    <script>
+        // --- 內建題庫資料 (您之前提供的) ---
+        const builtInQuizzes = {
+            "L7": [
+                { q: "本文指出《格理弗遊記》的本質最接近下列何者？", options: ["童話故事，純為娛樂", "寓言諷刺，借虛構映照現實", "自然科普，介紹航海知識", "溫馨成長，描寫家庭生活"], a: 1, detail: "文中提到它其實是一部用來諷刺人性、英國時政與權貴的作品。" },
+                { q: "出版社改變絲線顏色的後果，最貼近哪一項？", options: ["強化舞技描寫", "使諷刺意義消失", "讓讀者更容易記憶", "凸顯貴族禮儀之美"], a: 1, detail: "文中明確指出：顏色一改，寓意就煙消雲散。" },
+                { q: "「藍、紅、綠」三色分別影射的對象是：", options: ["三種舞蹈的級別", "英國三種勳章", "三位主角的衣著", "不同國家的國旗"], a: 1, detail: "對應嘉德勳章、巴斯勳章、薊勳章。" },
+                { q: "文中說凌波舞需筋骨柔軟，作者藉此影射：", options: ["勤學舞技者受賞", "沒有骨氣者易得寵", "體育越好官位越高", "舞者都成為貴族"], a: 1, detail: "影射沒有骨氣的人才能得到寵愛、成為高官。" },
+                { q: "早期中譯把「醫學」誤為「格物學」的影響是：", options: ["主人翁專業與角色被改變", "更符合讀者口味", "提升文本流暢度", "使內容更客觀"], a: 0, detail: "主人翁船醫的身分也就變了，在長途航行中該如何發揮所學令人困惑。" }
+            ],
+            "L8": [
+                { q: "作者常走向圖書館，主要目的為何？", options: ["欣賞建築外觀", "為查找資料與學習", "與朋友聚會", "參加社團活動"], a: 1, detail: "文中提到：去愛丁堡是為了學習...找資料。" },
+                { q: "「大象咖啡館」帶給作者的感受最貼近：", options: ["價格便宜的庶民氣息", "讓我感到歷史的深長與自我渺小", "是唯一能看報的地方", "結識許多新朋友"], a: 1, detail: "城堡歷史有幾千年，而我在這裡的時間，只是短暫的一小部分。" },
+                { q: "作者對愛丁堡的記憶模糊最可能因為：", options: ["完全不喜歡那裡", "只專注在學業路徑", "城市太小無聊", "常常迷路"], a: 1, detail: "只記得從我住的地方走到圖書館的路...專注於一個目標。" },
+                { q: "文中「每一天都不是單獨的日子」的含義是：", options: ["每天毫無安排", "每天都與長期目標相連", "每天都一模一樣", "每天都有突發事件"], a: 1, detail: "是一連串朝向未來的日子（為了完成學業回家）。" },
+                { q: "對於年輕時的單一專注，作者後來的反思是：", options: ["非常值得，毫無遺憾", "讓視野狹窄，可能錯過其他生活", "證明我比別人優秀", "使記憶力變更好"], a: 1, detail: "文末：發現這樣單一的專注會讓我們的視野變得狹窄。" }
+            ],
+            "L9": [
+                { q: "為何說「親耕」像一場表演？", options: ["因所有人都會跳舞", "因有演員扮神祇、眾人依儀節模擬耕作", "因在戲院舉行", "因只有皇帝參加"], a: 1, detail: "找專業演員假扮風神雨神，還有農民參加，像在演戲。" },
+                { q: "皇帝使用的犁有何特色？", options: ["銀製並刻風神", "金色並刻龍紋", "木製並無裝飾", "玉製並刻雲紋"], a: 1, detail: "特別華麗的金色犁，上面還有龍的雕刻。" },
+                { q: "親耕完成後的流程包含：", options: ["洗犁、焚香", "樂舞大會", "地方官播種與獻五穀、眾人呼萬歲", "御史宣讀罪狀"], a: 2, detail: "最高地方官負責播種...獻上五穀...高喊萬歲。" },
+                { q: "早朝中御史的職責是：", options: ["唱太平歌", "點名並記錄失禮行為", "負責播種", "護駕執戟"], a: 1, detail: "御史會負責點名，並且記錄那些咳嗽或有不禮貌行為的官員名字。" },
+                { q: "文官與武官在早朝時：", options: ["混站一處", "各列其位", "可隨意坐下", "輪流當御史"], a: 1, detail: "大家會站好隊伍，文官和武官各自站在不同的位置。" }
+            ]
+        };
+
+        const stories = [
+            {
+                id: "L7",
+                title: "L7 格理弗遊記的諷刺與翻譯",
+                description: "這部童話經典其實隱藏著辛辣的政治諷刺。當翻譯出錯或細節被改動時，寓意就會煙消雲散。",
+                difficulty: "進階",
+                hasBuiltInQuiz: true,
+                segments: [
+                    { text: "綏夫特《格理弗遊記》（舊譯《格列佛遊記》或《大小人國遊記》）在中文世界裡幾乎是人盡皆知的兒童奇幻文學，但在英文世界裡它其實是一部用來諷刺人性、英國時政與權貴的作品。原書有四冊，但許多中譯本只有第一、二冊的《小人國》、《大人國》，使人無法窺其全貌。", question: "既然是針對「英國時政」的諷刺作品，您預測作者在描寫小人國的國王與官員時，會刻意安排什麼樣滑稽的舉動來影射現實？", hint: "思考：權力者通常很有威嚴，若讓他們做一些卑微或奇怪的動作，會有什麼諷刺效果？" },
+                    { text: "在原始版本中，小人國國王將三種不同顏色的細絲線：藍、紅、綠，賞賜給表演類似凌波舞舞技最佳的三個人。其實不同顏色的絲線，是分別影射當時三種頒予爵士的勳章：藍色綬帶的嘉德勳章、紅色綬帶的巴斯勳章、綠色綬帶的薊勳章。", question: "作者為什麼要用「凌波舞技」來決定誰能獲得象徵榮譽的絲線（勳章）？這在影射當時官員的什麼特質？", hint: "思考：跳凌波舞需要筋骨柔軟。在官場上，「柔軟」的人代表什麼？" },
+                    { text: "因為凌波舞高手的筋骨要很柔軟，綏夫特用來影射沒有骨氣的人才能得到寵愛、成為高官。但也因為暗示過於明顯，出版商擔心會得罪當道，所以在出版時將絲線的顏色改為紫、黃、白。顏色一改，寓意就煙消雲散。", question: "除了內容的改動，文章提到「翻譯」也會造成影響。如果將主角的重要專業身分譯錯，您預測會對故事的邏輯產生什麼衝擊？", hint: "思考：主角在航行中若遇到傷病，他的身分必須合理才能解決問題。" },
+                    { text: "此外，早期的中文版有誤譯之處。如原書中應指「醫學」一詞，卻被譯者翻成「格物學」。所學的內容一變，主人翁船醫的身分也就變了，在長途航行中該如何發揮所學令人有些困惑。由此可見，翻譯時被誤解的內容，有時會有極大的影響。", question: "練習結束。", isEnd: true }
+                ]
+            },
+            {
+                id: "L8",
+                title: "L8 愛丁堡的圖書館與時間表",
+                description: "關於一段異鄉求學的記憶。當生活只剩下一條通往目標的路徑時，我們會錯過什麼？",
+                difficulty: "中等",
+                hasBuiltInQuiz: true,
+                segments: [
+                    { text: "最近，我經常想起愛丁堡，可能是因為冬天快到了吧。愛丁堡是一個很冷的城市。當我想起這個城市的時候，我通常只記得從我住的地方走到圖書館的路。其他的地方，我有時候連名字都記不清了。我在愛丁堡住了三年，但離開後，有關它的記憶卻漸漸模糊起來。", question: "作者提到對這座城市的記憶只剩下「去圖書館的路」，這可能反映了他當時在異鄉的生活重心是什麼？", hint: "思考：一個留學生除了圖書館，還有什麼可能是他生活的中心？" },
+                    { text: "在愛丁堡期間，我常常從宿舍走到國家圖書館。有時候，我也會去大學圖書館或神學院圖書館找資料。我喜歡圖書館，尤其是那些老舊的圖書館，因為那裡有厚重的木頭桌椅，氣氛很安靜，而且有一種古老書本的味道。我最期待的時間是下午三四點，那時我會去對面的“大象咖啡館”喝咖啡，吃杏仁牛角麵包，並看報紙。那家咖啡館的窗戶正好對著一座古老的城堡。在溫暖熱鬧的咖啡館裡，看著遠處冷峻的城堡，給了我一種特別的感受。", question: "在溫暖的咖啡館看著「冷峻且歷史悠久」的城堡，作者說這提醒他「在這裡的時間只是短暫的一小部分」。您預測作者接下來會如何描述他對「時間」的規劃？", hint: "思考：既然感覺到時間短暫，人通常會產生一種緊迫感或計畫感。" },
+                    { text: "就像是在提醒我，城堡的歷史有幾千年，而我在這裡的時間，只是短暫的一小部分。當我二十多歲的時候，我去愛丁堡是為了學習。我知道我不會永遠住在那裡，因為我只是為了完成學業，然後要回家。那時，我心裡有一張時間表，提醒我什麼時候要完成學業回家。這讓我的每一天都不是單獨的日子，而是一連串朝向未來的日子。", question: "作者提到他當時有一張「時間表」且極度專注於目標。這聽起來很積極，但您預測作者長大後會如何反思這段「單一專注」的日子？", hint: "思考：過度專注於單一目標（如學業），可能會讓我們忽略周遭的什麼事物？" },
+                    { text: "那時候，我們專注於一個目標——學習。我們不知道這樣做會讓我們錯過許多其他的事情。等我們長大一些後，才會發現這樣單一的專注會讓我們的視野變得狹窄。由這個故事我們可以發現，在朝向目標前進的同時，也要學會抬頭看看身邊的風景。", question: "練習結束。", isEnd: true }
+                ]
+            },
+            {
+                id: "L9",
+                title: "L9 親耕儀式與早朝秩序",
+                description: "古代皇帝的日常生活。透過親耕的「表演」與早朝的「紀律」，看見政權的象徵意義。",
+                difficulty: "中等",
+                hasBuiltInQuiz: true,
+                segments: [
+                    { text: "在古代，皇帝是全國最高的領導人，他的很多行動都有特別的象徵意義。每年，皇帝會在先農壇附近進行一個叫「親耕」的活動，這有點像是一場表演。在這個活動開始前，政府會找一些專業的演員來假扮成風神、雨神等，還會邀請很多在地的農民來參加，就像在演戲一樣。", question: "既然說這是一場「表演」，且連風神、雨神都有人假扮，您預測皇帝所使用的耕地工具（犁），會是普通的農具還是有特殊的裝飾？", hint: "思考：身為最高領導人的「表演」，細節一定會展現出權威感。" },
+                    { text: "活動開始時，有兩個官員牽著牛，兩位長輩扶著犁，其他被指定的農民則帶著各種農具，模仿耕作的樣子。有些演員還會裝扮成村裡的人，唱著太平的歌。皇帝用的犁和別人的不一樣，是特別華麗的金色犁，上面還有龍的雕刻。在兩位長輩的幫忙下，皇帝走過田地三次，就完成了「親耕」的儀式。", question: "皇帝完成這三次象徵性的耕作後，接下來會由誰來繼續完成播種工作？最後如何向皇帝表達祝賀？", hint: "思考：儀式的完成通常需要地方官員的配合，最後還要有一種「大豐收」的氛圍。" },
+                    { text: "完成後，皇帝坐下來，欣賞其他官員模仿他的動作。北京的最高地方官負責播種，他播完種後，有人會端上象徵好收成的五穀，向皇帝獻上，表示因為皇帝的辛勞帶來了豐收。這時候，大家都會向皇帝高喊萬歲，祝賀他。不過，皇帝的事情不都是這麼輕鬆好玩的，像每天的「早朝」就很嚴肅。", question: "早朝是非常嚴肅的。您預測在早朝的隊伍中，官員的行為會受到什麼樣的監督？", hint: "思考：在皇帝面前，咳嗽或不禮貌的行為會被允許嗎？" },
+                    { text: "門開了之後，大家會站好隊伍，文官和武官各自站在不同的位置。御史會負責點名，並且記錄那些咳嗽或有不禮貌行為的官員名字。接著皇帝來了，所有官員都要向皇帝行禮。然後，一些重要的官員會進入大殿報告事情。這些早朝的活動大約會在日出時開始，不久後結束。由這篇文章可見，古代的儀節是為了維持秩序與統治的莊嚴感。", question: "練習結束。", isEnd: true }
+                ]
+            },
+            {
+                id: "RADISH",
+                title: "蘿蔔 5 大部位料理密技",
+                description: "別再丟整根蘿蔔做菜！農糧署教你分部位料理，美味度瞬間升級！",
+                difficulty: "入門",
+                segments: [
+                    { text: "蘿蔔是家庭餐桌常見的食材...（略）", question: "您預測「上部」與「下部」在味道上有什麼差異？", hint: "思考：植物哪裡最嫩？" },
+                    { text: "根據農糧署的分享，蘿蔔的「上部」...（略）", question: "既然上部適合生食，那「下部」適合哪種料理？", hint: "提示：辛辣的部位怎麼煮？" },
+                    { text: "至於蘿蔔的「下部」...（略）", question: "練習結束。", isEnd: true }
+                ]
+            }
+        ];
+
+        // --- APP STATE ---
+        const appState = {
+            view: 'home',
+            studentName: '',
+            selectedStory: null,
+            segmentIndex: 0,
+            history: [],
+            apiKey: '',
+            quizQuestions: [],
+            userAnswers: {},
+            quizScore: 0
+        };
+
+        const appDiv = document.getElementById('app');
+
+        // --- RENDER ---
+        function render() {
+            appDiv.innerHTML = '';
+            if (appState.view === 'home') renderHome();
+            else if (appState.view === 'reading') renderReading();
+            else if (appState.view === 'summary') renderSummary();
+            else if (appState.view === 'quiz') renderQuiz();
+            else if (appState.view === 'quizResult') renderQuizResult();
+        }
+
+        // 1. HOME
+        function renderHome() {
+            appDiv.innerHTML = `
+                <div class="text-center mb-8">
+                    <h1>📚 預測閱讀策略練習器</h1>
+                    <p style="color:var(--text-sub)">結合內建測驗與 AI 輔助</p>
+                </div>
+                <div class="card mb-8" style="max-width:500px; margin:0 auto;">
+                    <label class="font-bold mb-2" style="display:block">學生姓名</label>
+                    <input class="input-field mb-4" placeholder="請輸入姓名..." value="${appState.studentName}" oninput="appState.studentName=this.value">
+                    <label class="font-bold mb-2" style="display:block">Gemini API Key (選填)</label>
+                    <input class="input-field" type="password" placeholder="若要使用 AI 出題請填入..." value="${appState.apiKey}" oninput="appState.apiKey=this.value">
+                </div>
+                <div class="grid-layout">
+                    ${stories.map(s => `
+                        <div class="card flex flex-col justify-between">
+                            <div>
+                                <span class="tag">${s.difficulty}</span>
+                                <h3>${s.title}</h3>
+                                <p style="font-size:0.9rem; color:var(--text-sub)">${s.description}</p>
+                            </div>
+                            <button class="btn btn-primary w-full mt-4" onclick="startStory('${s.id}')">開始練習</button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // 2. READING
+        function renderReading() {
+            const seg = appState.selectedStory.segments[appState.segmentIndex];
+            const total = appState.selectedStory.segments.length - 1;
+            
+            let content = `
+                <div class="flex justify-between items-center mb-4">
+                    <button class="btn btn-secondary" onclick="goHome()">退出</button>
+                    <span class="font-bold text-sub">進度: ${appState.segmentIndex + 1} / ${total}</span>
+                </div>
+                <div class="reading-text">${seg.text}</div>
+            `;
+
+            if (!seg.isEnd) {
+                content += `
+                    <div class="card" style="background:#eef2ff; border-color:#c7d2fe;">
+                        <h3 style="color:#4338ca; margin-bottom:0.5rem;">💡 預測提問</h3>
+                        <p class="font-bold mb-2">${seg.question}</p>
+                        <p class="text-sm" style="color:#64748b; margin-bottom:1rem;">提示：${seg.hint}</p>
+                        <textarea id="predInput" class="input-field mb-4" style="min-height:100px" placeholder="我預測接下來..."></textarea>
+                        <div class="flex justify-end">
+                            <button class="btn btn-primary" onclick="submitPred()">確認並繼續</button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                content += `
+                    <div class="text-center mt-8">
+                        <h2 style="color:var(--success)">🎉 閱讀完成！</h2>
+                        <button class="btn btn-success mt-4" style="font-size:1.2rem; padding:1rem 2rem;" onclick="finishReading()">前往總結與測驗 👉</button>
+                    </div>
+                `;
+            }
+            appDiv.innerHTML = content;
+        }
+
+        // 3. SUMMARY & QUIZ ENTRY
+        function renderSummary() {
+            const story = appState.selectedStory;
+            const historyHtml = appState.history.map((h, i) => `
+                <div style="border-left:4px solid #cbd5e1; padding-left:1rem; margin-bottom:1.5rem;">
+                    <div style="background:#f8fafc; padding:1rem; border-radius:8px; margin-bottom:0.5rem;">${h.text}</div>
+                    <div style="color:#d97706; font-weight:bold;">您的預測：${h.pred}</div>
+                </div>
+            `).join('');
+
+            // Determine Quiz Button Type
+            let quizBtn = '';
+            if (story.hasBuiltInQuiz) {
+                quizBtn = `<button class="btn btn-warning" style="font-size:1.2rem;" onclick="startBuiltInQuiz()">📝 進入閱讀理解測驗 (內建)</button>`;
+            } else {
+                quizBtn = `<button class="btn btn-ai" style="font-size:1.2rem;" onclick="generateAiQuiz()">✨ AI 生成測驗 (需 API Key)</button>`;
+            }
+
+            appDiv.innerHTML = `
+                <div class="flex justify-between items-center mb-8">
+                    <h2>學習紀錄卡</h2>
+                    <div class="flex gap-2">
+                        <button class="btn btn-secondary" onclick="window.print()">列印/存 PDF</button>
+                        <button class="btn btn-secondary" onclick="goHome()">回首頁</button>
+                    </div>
+                </div>
+                <div class="card mb-8">
+                    <div style="border-bottom:2px solid #e2e8f0; padding-bottom:1rem; margin-bottom:1rem; display:flex; justify-content:space-between;">
+                        <div>
+                            <h2 style="color:var(--primary); margin:0;">${story.title}</h2>
+                            <span style="color:var(--text-sub)">預測歷程紀錄</span>
+                        </div>
+                        <div class="text-center">
+                            <div style="font-size:0.8rem; color:var(--text-sub)">學生</div>
+                            <div class="font-bold text-lg">${appState.studentName}</div>
+                        </div>
+                    </div>
+                    ${historyHtml}
+                    <div style="background:#1e293b; color:white; padding:1.5rem; border-radius:10px; margin-top:2rem;">
+                        <h4 style="margin-bottom:0.5rem; color:#a5b4fc;">結局</h4>
+                        ${story.segments[story.segments.length-1].text}
+                    </div>
+                </div>
+                <div class="text-center mb-12 no-print">
+                    ${quizBtn}
+                </div>
+            `;
+        }
+
+        // 4. QUIZ
+        function renderQuiz() {
+            const questions = appState.quizQuestions.map((q, i) => `
+                <div class="card mb-6">
+                    <h3 class="mb-4">Q${i+1}. ${q.q}</h3>
+                    <div>
+                        ${q.options.map((opt, optI) => `
+                            <div class="quiz-option ${appState.userAnswers[i] === optI ? 'selected' : ''}" 
+                                 onclick="selectAnswer(${i}, ${optI})">
+                                ${opt}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+
+            appDiv.innerHTML = `
+                <div class="text-center mb-8">
+                    <h1>閱讀理解測驗</h1>
+                    <p>請回答以下問題，測試您對文章的理解程度。</p>
+                </div>
+                <div style="max-width:800px; margin:0 auto;">
+                    ${questions}
+                    <div class="text-center mt-8 mb-12">
+                        <button class="btn btn-success" style="font-size:1.2rem; padding:1rem 3rem;" onclick="submitQuiz()">交卷計分</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 5. QUIZ RESULT
+        function renderQuizResult() {
+            const score = appState.quizScore;
+            const total = appState.quizQuestions.length;
+            const pct = Math.round((score/total)*100);
+
+            const resultHtml = appState.quizQuestions.map((q, i) => {
+                const userAns = appState.userAnswers[i];
+                const isCorrect = userAns === q.a;
+                return `
+                    <div class="card mb-6" style="border-left: 6px solid ${isCorrect ? 'var(--success)' : 'var(--danger)'}">
+                        <h3 class="mb-4" style="color:${isCorrect ? 'var(--success)' : 'var(--danger)'}">
+                            ${isCorrect ? '✅ 答對' : '❌ 答錯'} Q${i+1}. ${q.q}
+                        </h3>
+                        ${q.options.map((opt, optI) => {
+                            let cls = 'quiz-option disabled';
+                            if (optI === q.a) cls += ' correct'; // 正解
+                            else if (optI === userAns && !isCorrect) cls += ' wrong'; // 選錯
+                            return `<div class="${cls}">${opt}</div>`;
+                        }).join('')}
+                        <div class="explanation-box">
+                            <strong>💡 解析：</strong> ${q.detail}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            appDiv.innerHTML = `
+                <div class="text-center mb-8 no-print">
+                    <h1>測驗結果</h1>
+                    <div class="flex justify-center gap-4 mt-4">
+                        <button class="btn btn-secondary" onclick="window.print()">列印成績單</button>
+                        <button class="btn btn-secondary" onclick="goHome()">返回首頁</button>
+                    </div>
+                </div>
+                <div class="card mb-8 text-center" style="background:linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-color:#bae6fd;">
+                    <div style="font-size:3rem; font-weight:bold; color:${pct >= 60 ? 'var(--success)' : 'var(--danger)'}">${score} / ${total}</div>
+                    <div style="color:#0369a1; font-weight:bold;">得分 (${pct}%)</div>
+                    <div class="mt-2 text-lg">學生：${appState.studentName}</div>
+                </div>
+                <div style="max-width:800px; margin:0 auto;">${resultHtml}</div>
+            `;
+        }
+
+        // --- ACTIONS ---
+        function startStory(id) {
+            if(!appState.studentName) return alert('請先輸入姓名！');
+            appState.selectedStory = stories.find(s => s.id === id);
+            appState.segmentIndex = 0;
+            appState.history = [];
+            appState.view = 'reading';
+            render();
+        }
+
+        function submitPred() {
+            const val = document.getElementById('predInput').value;
+            if(!val.trim()) return alert('請輸入預測內容！');
+            const seg = appState.selectedStory.segments[appState.segmentIndex];
+            appState.history.push({ text: seg.text, pred: val });
+            if(appState.segmentIndex < appState.selectedStory.segments.length - 1) {
+                appState.segmentIndex++;
+                render();
+            } else {
+                finishReading();
+            }
+        }
+
+        function finishReading() { appState.view = 'summary'; render(); }
+        function goHome() { if(confirm('確定回首頁？進度將消失')) { appState.view = 'home'; render(); } }
+
+        // --- QUIZ ACTIONS ---
+        function startBuiltInQuiz() {
+            const id = appState.selectedStory.id;
+            if (builtInQuizzes[id]) {
+                appState.quizQuestions = builtInQuizzes[id];
+                appState.userAnswers = {};
+                appState.view = 'quiz';
+                render();
+            } else {
+                alert("此文章無內建測驗，請嘗試 AI 生成。");
+            }
+        }
+
+        async function generateAiQuiz() {
+            if(!appState.apiKey) return alert("請先在首頁輸入 API Key！");
+            
+            const btn = document.querySelector('.btn-ai');
+            const oldText = btn.innerHTML;
+            btn.innerHTML = '⏳ AI 出題中...';
+            btn.disabled = true;
+
+            const fullText = appState.selectedStory.segments.map(s => s.text).join('\n');
+            const prompt = `請根據以下文章設計 5 題繁體中文閱讀測驗。JSON格式：[{ "q": "問題", "options": ["A", "B", "C", "D"], "a": 0, "detail": "解析" }]。文章：${fullText}`;
+            
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${appState.apiKey}`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
+                });
+                const data = await response.json();
+                appState.quizQuestions = JSON.parse(data.candidates[0].content.parts[0].text);
+                appState.userAnswers = {};
+                appState.view = 'quiz';
+                render();
+            } catch(e) {
+                alert("生成失敗，請檢查 API Key。");
+                btn.innerHTML = oldText;
+                btn.disabled = false;
+            }
+        }
+
+        function selectAnswer(qIdx, optIdx) {
+            appState.userAnswers[qIdx] = optIdx;
+            render();
+        }
+
+        function submitQuiz() {
+            if(Object.keys(appState.userAnswers).length < appState.quizQuestions.length) {
+                if(!confirm("還有題目沒寫完，確定交卷？")) return;
+            }
+            let score = 0;
+            appState.quizQuestions.forEach((q, i) => {
+                if(appState.userAnswers[i] === q.a) score++;
+            });
+            appState.quizScore = score;
+            appState.view = 'quizResult';
+            render();
+        }
+
+        // Init
+        render();
+    </script>
+</body>
+</html>
